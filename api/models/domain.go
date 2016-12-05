@@ -1,18 +1,15 @@
 package models
 
 import (
-	"crypto/x509"
-	"encoding/pem"
 	"fmt"
-	"regexp"
-	"strconv"
 	"strings"
 	"time"
 
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/service/acm"
-	"github.com/aws/aws-sdk-go/service/cloudformation"
-	"github.com/aws/aws-sdk-go/service/iam"
+	//"github.com/aws/aws-sdk-go/aws"
+	//"github.com/aws/aws-sdk-go/service/acm"
+	//"github.com/aws/aws-sdk-go/service/cloudformation"
+	//"github.com/aws/aws-sdk-go/service/iam"
+	"github.com/aws/aws-sdk-go/service/swf"
 )
 
 type Domain struct {
@@ -27,11 +24,11 @@ type Domain struct {
 type Domains []Domain
 
 func ListDomains(a string) (Domains, error) {
-	app, err := GetApp(a)
+	//app, err := GetApp(a)
 
-	if err != nil {
-		return nil, err
-	}
+	//if err != nil {
+		//return nil, err
+	//}
 
 	domains := make(Domains, 0)
 	fmt.Println(domains)
@@ -60,6 +57,8 @@ func UpdateDomain(app, process string, port int, id string) (*Domain, error) {
 
 	arn := ""
 
+	res, err := SWF().ListDomains()
+	/*
 	if strings.HasPrefix(id, "acm-") {
 		uuid := id[4:]
 
@@ -126,6 +125,7 @@ func UpdateDomain(app, process string, port int, id string) (*Domain, error) {
 		return nil, err
 	}
 
+	*/
 	domain := Domain{
 		Port:    port,
 		Process: process,
