@@ -9,6 +9,12 @@ builder:
 fixtures:
 	make -C api/models/fixtures
 
+manpages: ## Generate man pages from go source and markdown
+	docker build -t convox-manpage-dev -f "man/Dockerfile" ./man
+	docker run --rm \
+		-v $(PWD):/go/src/github.com/convox/rack/ \
+		convox-manpage-dev
+
 release:
 	make -C provider release VERSION=$(VERSION)
 	docker build -t convox/api:$(VERSION) .
