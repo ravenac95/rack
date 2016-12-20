@@ -640,6 +640,8 @@ func FriendlyName(t string) string {
 		return "Access Key"
 	case "AWS::IAM::InstanceProfile":
 		return ""
+	case "AWS::IAM::ManagedPolicy":
+		return "IAM Managed Policy"
 	case "AWS::IAM::Role":
 		return ""
 	case "AWS::IAM::User":
