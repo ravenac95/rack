@@ -55,10 +55,6 @@ type DevRack struct {
 	stack        *cloudformation.Stack
 	client       *client.Client
 	awsSess      *session.Session
-	cfSvc        *cloudformation.CloudFormation
-	s3Svc        *s3.S3
-	ecrSvc       *ecr.ECR
-	ec2Svc       *ec2.EC2
 	changeQueue  []DevRackChange
 }
 
@@ -82,10 +78,6 @@ func NewDevRack(client *client.Client) (*DevRack, error) {
 		Region:    region,
 		awsSess:   session,
 		client:    client,
-		cfSvc:     cloudformation.New(session),
-		s3Svc:     s3.New(session),
-		ecrSvc:    ecr.New(session),
-		ec2Svc:    ec2.New(session),
 	}
 
 	err = devRack.LoadEnv()
@@ -100,11 +92,51 @@ func NewDevRack(client *client.Client) (*DevRack, error) {
 	return &devRack, nil
 }
 
+func (d *DevRack) ec2() *ec2.EC2 {
+	return ec2.New(d.awsSess)
+}
+
+func (d *DevRack) ecr() *ecr.ECR {
+	return ecr.New(d.awsSess)
+}
+
+func (d *DevRack) s3() *s3.S3 {
+	return s3.New(d.awsSess)
+}
+
+func (d *DevRack) cf() *cloudformation.CloudFormation {
+	return cloudformation.New(d.awsSess)
+}
+
+// EnableDevelopmentOnRack - Enables Development=Yes on the rack params
+func (d *DevRack) EnableDevelopmentOnRack() error {
+	system, err := d.client.GetSystem()
+	if err != nil {
+		return err
+	}
+	params := map[string]string{
+		"Development": "Yes",
+	}
+
+	fmt.Println("Ensuring Development=Yes is set for the current rack")
+
+	err = d.client.SetParameters(system.Name, params)
+	if err != nil {
+		if strings.Contains(err.Error(), "No updates are to be performed") {
+			return nil
+		}
+		return stdcli.Error(err)
+	}
+	return nil
+}
+
+// LoadEnv - Loads the environment
 func (d *DevRack) LoadEnv() error {
+	fmt.Println("Loading environment values from the Rack's output")
 	params := &cloudformation.DescribeStacksInput{
 		StackName: aws.String(d.StackName),
 	}
-	resp, err := d.cfSvc.DescribeStacks(params)
+	resp, err := d.cf().DescribeStacks(params)
 	if err != nil {
 		return err
 	}
@@ -118,6 +150,7 @@ func (d *DevRack) LoadEnv() error {
 	return nil
 }
 
+// ExportEnv - Exports the stack output to an environment file that can be used with convox start
 func (d *DevRack) ExportEnv(output io.WriteCloser) error {
 	for key, value := range d.Env {
 		envKey := strings.ToUpper(envKeyReplaceRegex.ReplaceAllString(key, "${1}_${2}"))
@@ -173,7 +206,7 @@ func (d *DevRack) saveDevRackSettings(rackSettings *DevRackSettings) error {
 		Body:        bytes.NewReader(body),
 	}
 
-	_, err = d.s3Svc.PutObject(&params)
+	_, err = d.s3().PutObject(&params)
 	if err != nil {
 		return err
 	}
@@ -184,6 +217,7 @@ func (d *DevRack) HasDevRackSettings() bool {
 	return d.RackSettings != nil
 }
 
+// LoadDevRackSettings - Loads the Dev Rack settings from the settings bucket
 func (d *DevRack) LoadDevRackSettings() error {
 	settingsBucketName := d.SettingsBucket()
 
@@ -191,7 +225,7 @@ func (d *DevRack) LoadDevRackSettings() error {
 		Bucket: aws.String(settingsBucketName),
 		Key:    aws.String(DevRackSettingsKey),
 	}
-	output, err := d.s3Svc.GetObject(params)
+	output, err := d.s3().GetObject(params)
 	rackSettings := DevRackSettings{}
 	if err != nil {
 		if aerr, ok := err.(awserr.Error); ok {
@@ -222,7 +256,18 @@ func (d *DevRack) LoadDevRackSettings() error {
 	return nil
 }
 
+// Initialize - Initializes a rack for use as a development rack
+//
+// This will
+//   * Enable `Development=Yes` on the rack parameters
+//   * Create 2 ECR repositories to store test images
+//   * Creates a `dev-rack-settings.json` file in the S3 settings bucket of the rack.
+//     This is used to hold a reference to the ECR repositories.
 func (d *DevRack) Initialize() error {
+	err := d.EnableDevelopmentOnRack()
+	if err != nil {
+		return err
+	}
 	return d.initializeDevRackSettings()
 }
 
@@ -245,7 +290,7 @@ func (d *DevRack) createEcrRepo(name string) (string, error) {
 	params := ecr.CreateRepositoryInput{
 		RepositoryName: aws.String(name),
 	}
-	resp, err := d.ecrSvc.CreateRepository(&params)
+	resp, err := d.ecr().CreateRepository(&params)
 
 	if err != nil {
 		return "", err
@@ -257,7 +302,7 @@ func (d *DevRack) getEcrRepo(name string) (string, error) {
 	params := ecr.DescribeRepositoriesInput{
 		RepositoryNames: aws.StringSlice([]string{name}),
 	}
-	resp, err := d.ecrSvc.DescribeRepositories(&params)
+	resp, err := d.ecr().DescribeRepositories(&params)
 	if err != nil {
 		return "", err
 	}
@@ -337,7 +382,7 @@ func (d *DevRack) CommitRackChanges() error {
 		Parameters:       parameters,
 		TemplateURL:      aws.String(d.RackSettings.ConvoxFormationURL),
 	}
-	_, err := d.cfSvc.UpdateStack(&params)
+	_, err := d.cf().UpdateStack(&params)
 	return err
 }
 
@@ -374,7 +419,7 @@ func (d *DevRack) currentSecurityGroupIpPermissions() ([]*ec2.IpPermission, erro
 		},
 	}
 
-	resp, err := d.ec2Svc.DescribeSecurityGroups(&params)
+	resp, err := d.ec2().DescribeSecurityGroups(&params)
 	if err != nil {
 		return nil, err
 	}
@@ -413,7 +458,7 @@ func (d *DevRack) AddCurrentHostToSecurityGroup() error {
 		GroupId:    aws.String(d.Env["SecurityGroup"]),
 	}
 
-	_, err = d.ec2Svc.AuthorizeSecurityGroupIngress(&params)
+	_, err = d.ec2().AuthorizeSecurityGroupIngress(&params)
 	return err
 }
 
