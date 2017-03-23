@@ -165,6 +165,14 @@ func (a *App) Create() error {
 		params["Key"] = os.Getenv("ENCRYPTION_KEY")
 	}
 
+	if os.Getenv("LAMBDA_BUCKET") != "" {
+		params["LambdaBucket"] = os.Getenv("LAMBDA_BUCKET")
+	}
+
+	if os.Getenv("LAMBDA_KEY_PREFIX") != "" {
+		params["LambdaKeyPrefix"] = os.Getenv("LAMBDA_KEY_PREFIX")
+	}
+
 	tags := map[string]string{
 		"Rack":   os.Getenv("RACK"),
 		"System": "convox",

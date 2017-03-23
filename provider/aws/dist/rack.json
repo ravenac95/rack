@@ -5,6 +5,7 @@
     "BlankAmi": { "Fn::Equals": [ { "Ref": "Ami" }, "" ] },
     "BlankBuildImage": { "Fn::Equals": [ { "Ref": "BuildImage" }, "" ] },
     "BlankExistingVpc": { "Fn::Equals": [ { "Ref": "ExistingVpc" }, "" ] },
+    "BlankLambdaBucket": { "Fn::Equals": [ { "Ref": "LambdaBucket" }, "" ] },
     "BlankExistingVpcAndThirdAvailabilityZone": {
       "Fn::And": [ { "Condition": "BlankExistingVpc" }, { "Condition": "ThirdAvailabilityZone" } ]
     },
@@ -103,7 +104,7 @@
       "Value": { "Fn::GetAtt": [ "Balancer", "DNSName" ] }
     },
     "DockerImageApi": {
-      "Value": { "Fn::Join": [ ":", [ "convox/api", { "Ref": "Version" } ] ] }
+      "Value": { "Fn::Join": [ ":", [  { "Ref": "ConvoxApiImage" }, { "Ref": "Version" } ] ] }
     },
     "DynamoBuilds": {
       "Value": { "Ref": "DynamoBuilds" }
@@ -243,6 +244,12 @@
     "Vpccidr": {
       "Condition": "Development",
       "Value": { "Ref": "VPCCIDR" }
+    },
+    "LambdaKeyPrefix": {
+      "Value": {"Ref": "LambdaKeyPrefix"}
+    },
+    "LambdaBucket": {
+      "Value": {"Ref": "LambdaBucket"}
     }
   },
   "Parameters": {
@@ -427,6 +434,11 @@
       "MinLength" : "1",
       "Type": "String"
     },
+    "ConvoxApiImage": {
+      "Description": "Override the convox api image to deploy",
+      "Default": "convox/api",
+      "Type": "String"
+    },
     "VolumeSize": {
       "Type": "Number",
       "Description": "Default disk size in GB",
@@ -442,6 +454,16 @@
       "Description": "Dedicated Hardware",
       "Default": "default",
       "AllowedValues": [ "default", "dedicated" ]
+    },
+    "LambdaBucket": {
+      "Type": "String",
+      "Description": "The base to the s3 bucket for the lambda code",
+      "Default": ""
+    },
+    "LambdaKeyPrefix": {
+      "Type": "String",
+      "Description": "The key prefix for the lambda code. Generally should be `dev/`",
+      "Default": ""
     }
   },
   "Resources": {
@@ -621,8 +643,8 @@
       "Type": "AWS::Lambda::Function",
       "Properties": {
         "Code": {
-          "S3Bucket": { "Fn::Join": [ "-", [ "convox", { "Ref": "AWS::Region" } ] ] },
-          "S3Key": { "Fn::Join": [ "", [ "release/", { "Ref": "Version" }, "/lambda/formation.zip" ] ] }
+          "S3Bucket": { "Fn::If": ["BlankLambdaBucket", { "Fn::Join": [ "-", [ "convox", { "Ref": "AWS::Region" } ] ] }, {"Ref": "LambdaBucket"} ] },
+          "S3Key": { "Fn::Join": [ "", [ {"Ref": "LambdaKeyPrefix"}, "release/", { "Ref": "Version" }, "/lambda/formation.zip" ] ] }
         },
         "Description": "Convox handler for custom resources",
         "Handler": "index.external",
@@ -1789,8 +1811,8 @@
       "Type": "AWS::Lambda::Function",
       "Properties": {
         "Code": {
-          "S3Bucket": { "Fn::Join": [ "-", [ "convox", { "Ref": "AWS::Region" } ] ] },
-          "S3Key": { "Fn::Join": [ "", [ "release/", { "Ref": "Version" }, "/lambda/lifecycle.zip" ] ] }
+          "S3Bucket": { "Fn::If": ["BlankLambdaBucket", { "Fn::Join": [ "-", [ "convox", { "Ref": "AWS::Region" } ] ] }, {"Ref": "LambdaBucket"} ] },
+          "S3Key": { "Fn::Join": [ "", [ {"Ref": "LambdaKeyPrefix"}, "release/", { "Ref": "Version" }, "/lambda/lifecycle.zip" ] ] }
         },
         "Description": { "Fn::Join": [ "", [ "{\"Cluster\": \"", { "Ref": "Cluster" }, "\", \"Rack\": \"", { "Ref": "AWS::StackName" }, "\"}" ] ] },
         "Handler": "index.external",
@@ -2292,7 +2314,9 @@
               "ROLLBAR_TOKEN": "f67f25b8a9024d5690f997bd86bf14b0",
               "SEGMENT_WRITE_KEY": "KLvwCXo6qcTmQHLpF69DEwGf9zh7lt9i",
               "SETTINGS_BUCKET": { "Ref": "Settings" },
-              "STACK_ID": { "Ref": "AWS::StackId" }
+              "STACK_ID": { "Ref": "AWS::StackId" },
+              "LAMBDA_BUCKET": {"Ref": "LambdaBucket"},
+              "LAMBDA_KEY_PREFIX": {"Ref": "LambdaKeyPrefix"}
             },
             "Image": { "Fn::If": [ "BlankBuildImage", { "Fn::Join": [ ":", [ "convox/api", { "Ref": "Version" } ] ] }, { "Ref": "BuildImage" } ] },
             "Links": [],
@@ -2326,7 +2350,7 @@
               "CLOUDFORMATION_TOPIC": { "Ref": "CloudformationTopic" },
               "CLUSTER": { "Ref": "Cluster" },
               "CUSTOM_TOPIC": { "Fn::GetAtt": [ "CustomTopic", "Arn" ] },
-              "DOCKER_IMAGE_API": { "Fn::Join": [ ":", [ "convox/api", { "Ref": "Version" } ] ] },
+              "DOCKER_IMAGE_API": { "Fn::Join": [ ":", [ { "Ref": "ConvoxApiImage" }, { "Ref": "Version" } ] ] },
               "DYNAMO_BUILDS": { "Ref": "DynamoBuilds" },
               "DYNAMO_RELEASES": { "Ref": "DynamoReleases" },
               "ENCRYPTION_KEY": { "Ref": "EncryptionKey" },
@@ -2368,7 +2392,7 @@
               ] },
               "VPCCIDR": { "Ref": "VPCCIDR" }
             },
-            "Image": { "Fn::Join": [ ":", [ "convox/api", { "Ref": "Version" } ] ] },
+            "Image": { "Fn::Join": [ ":", [ { "Ref": "ConvoxApiImage" }, { "Ref": "Version" } ] ] },
             "Links": [],
             "Memory": { "Ref": "ApiMemory" },
             "Name": "web",
@@ -2404,7 +2428,7 @@
               "CLOUDFORMATION_TOPIC": { "Ref": "CloudformationTopic" },
               "CLUSTER": { "Ref": "Cluster" },
               "CUSTOM_TOPIC": { "Fn::GetAtt": [ "CustomTopic", "Arn" ] },
-              "DOCKER_IMAGE_API": { "Fn::Join": [ ":", [ "convox/api", { "Ref": "Version" } ] ] },
+              "DOCKER_IMAGE_API": { "Fn::Join": [ ":", [ { "Ref": "ConvoxApiImage" }, { "Ref": "Version" } ] ] },
               "DYNAMO_BUILDS": { "Ref": "DynamoBuilds" },
               "DYNAMO_RELEASES": { "Ref": "DynamoReleases" },
               "ENCRYPTION_KEY": { "Ref": "EncryptionKey" },
@@ -2442,7 +2466,7 @@
                 { "Ref": "ExistingVpc" }
               ] }
             },
-            "Image": { "Fn::Join": [ ":", [ "convox/api", { "Ref": "Version" } ] ] },
+            "Image": { "Fn::Join": [ ":", [  { "Ref": "ConvoxApiImage" }, { "Ref": "Version" } ] ] },
             "Links": [],
             "Memory": "64",
             "Name": "monitor",
