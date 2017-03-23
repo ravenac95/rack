@@ -38,5 +38,5 @@ devrelease:
 	docker push $(CONVOX_API_TAG):$(CONVOX_API_TAG_VERSION)
 
 devtools:
-	#make -C dev
+	mkdir -p dev
 	cd cmd/convox; go build -o ../../dev/convox -tags devtools
