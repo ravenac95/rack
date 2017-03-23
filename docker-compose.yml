@@ -39,6 +39,8 @@ services:
       - VPC
       - VPCCIDR
       - LOG_GROUP
+      - LAMBDA_KEY_PREFIX
+      - LAMBDA_BUCKET
       - PROCESS=web
     ports:
       - 80:3000
@@ -81,6 +83,8 @@ services:
       - SUBNETS_PRIVATE
       - VPC
       - LOG_GROUP
+      - LAMBDA_KEY_PREFIX
+      - LAMBDA_BUCKET
       - PROCESS=monitor
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
