@@ -10,5 +10,8 @@ mocks:
 release:
 	make -C aws release VERSION=$(VERSION)
 
+devrelease:
+	make -C aws devrelease VERSION=$(VERSION)
+
 templates:
 	make -C aws templates
