@@ -15,3 +15,6 @@ release: lambda.zip
 	for region in $(shell cat ../../../../REGIONS); do \
 		aws s3 cp lambda.zip s3://convox-$$region/release/$(VERSION)/lambda/fluentd.zip --acl public-read --region $$region; \
 	done
+
+devrelease: lambda.zip
+	aws s3 cp lambda.zip s3://$(DEV_RACK_SETTINGS_BUCKET)/dev/release/$(VERSION)/lambda/fluentd.zip --acl public-read --region $(DEV_RACK_REGION)
