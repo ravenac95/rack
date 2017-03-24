@@ -259,6 +259,20 @@ func (a *App) UpdateParams(changes map[string]string) error {
 		}
 	}
 
+	if os.Getenv("LAMBDA_BUCKET") != "" {
+		req.Parameters = append(req.Parameters, &cloudformation.Parameter{
+			ParameterKey:   aws.String("LambdaBucket"),
+			ParameterValue: aws.String(os.Getenv("LAMBDA_BUCKET")),
+		})
+	}
+
+	if os.Getenv("LAMBDA_KEY_PREFIX") != "" {
+		req.Parameters = append(req.Parameters, &cloudformation.Parameter{
+			ParameterKey:   aws.String("LambdaKeyPrefix"),
+			ParameterValue: aws.String(os.Getenv("LAMBDA_KEY_PREFIX")),
+		})
+	}
+
 	_, err := UpdateStack(req)
 
 	return err
