@@ -1,0 +1,11 @@
+#!/bin/bash
+# Sources the dev directory for the path
+
+original_path=$PATH
+DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+
+deactivate () {
+    export PATH=$original_path
+}
+
+export PATH=$DIR:$PATH
