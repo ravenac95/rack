@@ -1948,8 +1948,8 @@
       "Type": "AWS::Lambda::Function",
       "Properties": {
         "Code": {
-          "S3Bucket": { "Fn::Join": [ "-", [ "convox", { "Ref": "AWS::Region" } ] ] },
-          "S3Key": { "Fn::Join": [ "", [ "release/", { "Ref": "Version" }, "/lambda/ecsevents.zip" ] ] }
+          "S3Bucket": { "Fn::If": ["BlankLambdaBucket", { "Fn::Join": [ "-", [ "convox", { "Ref": "AWS::Region" } ] ] }, {"Ref": "LambdaBucket"} ] },
+          "S3Key": { "Fn::Join": [ "", [ {"Ref": "LambdaKeyPrefix"}, "release/", { "Ref": "Version" }, "/lambda/ecsevents.zip" ] ] }
         },
         "Description": "Handler for ECS events.",
         "Handler": "index.external",

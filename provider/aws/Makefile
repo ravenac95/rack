@@ -18,6 +18,7 @@ devrelease:
 	make -C lambda/formation devrelease VERSION=$(VERSION)
 	make -C lambda/lifecycle devrelease VERSION=$(VERSION)
 	make -C lambda/cfevents devrelease VERSION=$(VERSION)
+	make -C lambda/ecsevents devrelease VERSION=$(VERSION)
 	mkdir -p /tmp/release/$(VERSION)
 	cd /tmp/release/$(VERSION)
 	jq '.Parameters.Version.Default |= "$(VERSION)"' dist/rack.json > formation.json
