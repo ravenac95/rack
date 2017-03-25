@@ -17,6 +17,14 @@
         ""
       ]
     },
+    "BlankLambdaBucket": {
+      "Fn::Equals": [
+        {
+          "Ref": "LambdaBucket"
+        },
+        ""
+      ]
+    },
     "BlankSecurityGroup": {
       "Fn::Equals": [
         {
@@ -298,6 +306,16 @@
     "Key": {
       "Default": "",
       "Description": "",
+      "Type": "String"
+    },
+    "LambdaBucket": {
+      "Default": "",
+      "Description": "The base to the s3 bucket for the lambda code",
+      "Type": "String"
+    },
+    "LambdaKeyPrefix": {
+      "Default": "",
+      "Description": "The key prefix for the lambda code. Generally should be `dev/`",
       "Type": "String"
     },
     "Private": {
@@ -708,20 +726,31 @@
       "Properties": {
         "Code": {
           "S3Bucket": {
-            "Fn::Join": [
-              "-",
-              [
-                "convox",
-                {
-                  "Ref": "AWS::Region"
-                }
-              ]
+            "Fn::If": [
+              "BlankLambdaBucket",
+              {
+                "Fn::Join": [
+                  "-",
+                  [
+                    "convox",
+                    {
+                      "Ref": "AWS::Region"
+                    }
+                  ]
+                ]
+              },
+              {
+                "Ref": "LambdaBucket"
+              }
             ]
           },
           "S3Key": {
             "Fn::Join": [
               "",
               [
+                {
+                  "Ref": "LambdaKeyPrefix"
+                },
                 "release/",
                 {
                   "Ref": "Version"
@@ -994,6 +1023,9 @@
                 }
               ]
             },
+            "DockerLabels": {
+              "convox.group": "web"
+            },
             "Environment": {
               "APP": "httpd",
               "AWS_REGION": "test",
@@ -1001,6 +1033,7 @@
                 "Ref": "LogGroup"
               },
               "PROCESS": "web",
+              "PROCESS_GROUP": "web",
               "RACK": "convox-test"
             },
             "ExtraHosts": [
@@ -1099,6 +1132,9 @@
                 }
               ]
             },
+            "DockerLabels": {
+              "convox.group": "worker"
+            },
             "Environment": {
               "APP": "httpd",
               "AWS_REGION": "test",
@@ -1106,6 +1142,7 @@
                 "Ref": "LogGroup"
               },
               "PROCESS": "worker",
+              "PROCESS_GROUP": "worker",
               "RACK": "convox-test"
             },
             "ExtraHosts": [

@@ -1,6 +1,14 @@
 {
   "AWSTemplateFormatVersion": "2010-09-09",
   "Conditions": {
+    "BlankLambdaBucket": {
+      "Fn::Equals": [
+        {
+          "Ref": "LambdaBucket"
+        },
+        ""
+      ]
+    },
     "BlankSecurityGroup": {
       "Fn::Equals": [
         {
@@ -193,6 +201,16 @@
       "Description": "",
       "Type": "String"
     },
+    "LambdaBucket": {
+      "Default": "",
+      "Description": "The base to the s3 bucket for the lambda code",
+      "Type": "String"
+    },
+    "LambdaKeyPrefix": {
+      "Default": "",
+      "Description": "The key prefix for the lambda code. Generally should be `dev/`",
+      "Type": "String"
+    },
     "MainFormation": {
       "Default": "1,0,256",
       "Description": "Number of processes to run, CPU units to reserve, and MB of RAM to reserve",
@@ -263,20 +281,31 @@
       "Properties": {
         "Code": {
           "S3Bucket": {
-            "Fn::Join": [
-              "-",
-              [
-                "convox",
-                {
-                  "Ref": "AWS::Region"
-                }
-              ]
+            "Fn::If": [
+              "BlankLambdaBucket",
+              {
+                "Fn::Join": [
+                  "-",
+                  [
+                    "convox",
+                    {
+                      "Ref": "AWS::Region"
+                    }
+                  ]
+                ]
+              },
+              {
+                "Ref": "LambdaBucket"
+              }
             ]
           },
           "S3Key": {
             "Fn::Join": [
               "",
               [
+                {
+                  "Ref": "LambdaKeyPrefix"
+                },
                 "release/",
                 {
                   "Ref": "Version"
@@ -396,6 +425,9 @@
                 }
               ]
             },
+            "DockerLabels": {
+              "convox.group": "main"
+            },
             "Environment": {
               "APP": "httpd",
               "AWS_REGION": "test",
@@ -403,6 +435,7 @@
                 "Ref": "LogGroup"
               },
               "PROCESS": "main",
+              "PROCESS_GROUP": "main",
               "RACK": "convox-test"
             },
             "ExtraHosts": [
