@@ -26,9 +26,12 @@ func TestProcessExec(t *testing.T) {
 		cycleProcessDescribeTasksAll,
 		cycleProcessDescribeTaskDefinition1,
 		cycleProcessDescribeContainerInstances,
+		cycleProcessDescribeInstances,
+		cycleProcessDescribeInstances,
 		cycleProcessDescribeTaskDefinition1,
 		cycleProcessDescribeContainerInstances,
-		cycleProcessDescribeRackInstances,
+		cycleProcessDescribeInstances,
+		cycleProcessDescribeInstances,
 		cycleProcessListTasksAll,
 		cycleProcessDescribeTasks,
 		cycleProcessDescribeContainerInstances,
@@ -37,7 +40,13 @@ func TestProcessExec(t *testing.T) {
 	defer provider.Close()
 
 	d := stubDocker(
+		cycleProcessDockerListContainers2,
+		cycleProcessDockerInspect,
+		cycleProcessDockerStats,
 		cycleProcessDockerListContainers1,
+		cycleProcessDockerInspect,
+		cycleProcessDockerStats,
+		cycleProcessDockerListContainers4,
 		cycleProcessDockerCreateExec,
 		cycleProcessDockerStartExec,
 		cycleProcessDockerResizeExec,
@@ -48,7 +57,7 @@ func TestProcessExec(t *testing.T) {
 	in := &bytes.Buffer{}
 	out := &bytes.Buffer{}
 
-	err := provider.ProcessExec("myapp", "5850760f0845", "ls -la", streamTester{in, out}, structs.ProcessExecOptions{
+	err := provider.ProcessExec("myapp", "5850760f0845-5f1193aff5fa", "ls -la", streamTester{in, out}, structs.ProcessExecOptions{
 		Height: 10,
 		Width:  20,
 	})
@@ -76,9 +85,10 @@ func TestProcessList(t *testing.T) {
 
 	ps := structs.Processes{
 		structs.Process{
-			ID:       "5850760f0845",
+			ID:       "5850760f0845-5f1193aff5fa",
 			App:      "myapp",
 			Name:     "web",
+			Group:    "web",
 			Release:  "R1234",
 			Command:  "",
 			Host:     "10.0.1.244",
@@ -89,9 +99,10 @@ func TestProcessList(t *testing.T) {
 			Memory:   0,
 		},
 		structs.Process{
-			ID:       "5850760f0846",
+			ID:       "5850760f0846-5f1193aff5f9",
 			App:      "myapp",
 			Name:     "web",
+			Group:    "web",
 			Release:  "R1234",
 			Command:  "ls -la 'name space'",
 			Host:     "10.0.1.244",
@@ -148,9 +159,10 @@ func TestProcessListWithBuildCluster(t *testing.T) {
 
 	ps := structs.Processes{
 		structs.Process{
-			ID:       "5850760f0845",
+			ID:       "5850760f0845-5f1193aff5fa",
 			App:      "myapp",
 			Name:     "web",
+			Group:    "web",
 			Release:  "R1234",
 			Command:  "",
 			Host:     "10.0.1.244",
@@ -161,9 +173,10 @@ func TestProcessListWithBuildCluster(t *testing.T) {
 			Memory:   0,
 		},
 		structs.Process{
-			ID:       "5850760f0846",
+			ID:       "5850760f0846-5f1193aff5f9",
 			App:      "myapp",
 			Name:     "web",
+			Group:    "web",
 			Release:  "R1234",
 			Command:  "ls -la 'name space'",
 			Host:     "10.0.1.244",
@@ -174,9 +187,10 @@ func TestProcessListWithBuildCluster(t *testing.T) {
 			Memory:   0,
 		},
 		structs.Process{
-			ID:       "5850760f0848",
+			ID:       "5850760f0848-5f1193aff5f9",
 			App:      "myapp",
 			Name:     "web",
+			Group:    "web",
 			Release:  "R1234",
 			Command:  "",
 			Host:     "10.0.1.244",
@@ -226,6 +240,9 @@ func TestProcessRunAttached(t *testing.T) {
 
 	d := stubDocker(
 		cycleProcessDockerListContainers1,
+		cycleProcessDockerInspect,
+		cycleProcessDockerStats,
+		cycleProcessDockerListContainers4,
 		cycleProcessDockerCreateExec,
 		cycleProcessDockerStartExec,
 		cycleProcessDockerResizeExec,
@@ -245,7 +262,7 @@ func TestProcessRunAttached(t *testing.T) {
 	})
 
 	assert.NoError(t, err)
-	assert.Equal(t, "5850760f0845", pid)
+	assert.Equal(t, "5850760f0845-5f1193aff5fa", pid)
 	assert.Equal(t, []byte(fmt.Sprintf("foo%s%d\n", aws.StatusCodePrefix, 0)), out.Bytes())
 }
 
@@ -273,7 +290,7 @@ func TestProcessRunDetached(t *testing.T) {
 	})
 
 	assert.NoError(t, err)
-	assert.Equal(t, "0f51f03ff369", pid)
+	assert.Equal(t, "0f51f03ff369-d2432bf11868", pid)
 }
 
 func TestProcessStop(t *testing.T) {
@@ -283,7 +300,7 @@ func TestProcessStop(t *testing.T) {
 	)
 	defer provider.Close()
 
-	err := provider.ProcessStop("myapp", "5850760f0845")
+	err := provider.ProcessStop("myapp", "5850760f0845-5f1193aff5fa")
 
 	assert.NoError(t, err)
 }
@@ -561,7 +578,7 @@ var cycleProcessDescribeTasks = awsutil.Cycle{
 					"containers": [
 						{
 							"name": "web",
-							"containerArn": "arn:aws:ecs:us-east-1:778743527532:container/3ab3b8c5-aa5c-4b54-89f8-5f1193aff5f9"
+							"containerArn": "arn:aws:ecs:us-east-1:778743527532:container/3ab3b8c5-aa5c-4b54-89f8-5f1193aff5fa"
 						}
 					]
 				}
@@ -616,7 +633,7 @@ var cycleProcessDescribeTasksAll = awsutil.Cycle{
 					"containers": [
 						{
 							"name": "web",
-							"containerArn": "arn:aws:ecs:us-east-1:778743527532:container/3ab3b8c5-aa5c-4b54-89f8-5f1193aff5f9"
+							"containerArn": "arn:aws:ecs:us-east-1:778743527532:container/3ab3b8c5-aa5c-4b54-89f8-5f1193aff5fa"
 						}
 					]
 				}
@@ -672,7 +689,7 @@ var cycleProcessDescribeTasksAllWithBuildCluster = awsutil.Cycle{
 					"containers": [
 						{
 							"name": "web",
-							"containerArn": "arn:aws:ecs:us-east-1:778743527532:container/3ab3b8c5-aa5c-4b54-89f8-5f1193aff5f9"
+							"containerArn": "arn:aws:ecs:us-east-1:778743527532:container/3ab3b8c5-aa5c-4b54-89f8-5f1193aff5fa"
 						}
 					]
 				}
@@ -969,6 +986,7 @@ var cycleProcessRegisterTaskDefinition = awsutil.Cycle{
 			"containerDefinitions": [
 				{
 					"dockerLabels": {
+						"convox.group": "web",
 						"convox.process.type": "oneoff"
 					},
 					"environment": [
@@ -986,6 +1004,10 @@ var cycleProcessRegisterTaskDefinition = awsutil.Cycle{
 						},
 						{
 							"name": "PROCESS",
+							"value": "web"
+						},
+						{
+							"name": "PROCESS_GROUP",
 							"value": "web"
 						},
 						{
@@ -1049,9 +1071,9 @@ var cycleProcessRunTaskAttached = awsutil.Cycle{
 				{
 					"containers": [
 						{
-							"containerArn": "arn:aws:ecs:us-east-1:012345678910:container/e1ed7aac-d9b2-4315-8726-d2432bf11868",
+							"containerArn": "arn:aws:ecs:us-east-1:778743527532:container/3ab3b8c5-aa5c-4b54-89f8-5f1193aff5fa",
 							"lastStatus": "PENDING",
-							"name": "wordpress",
+							"name": "web",
 							"taskArn": "arn:aws:ecs:us-east-1:012345678910:task/d8c67b3c-ac87-4ffe-a847-4785bc3a8b55"
 						}
 					],
@@ -1094,7 +1116,7 @@ var cycleProcessRunTaskDetached = awsutil.Cycle{
 						{
 							"containerArn": "arn:aws:ecs:us-east-1:012345678910:container/e1ed7aac-d9b2-4315-8726-d2432bf11868",
 							"lastStatus": "PENDING",
-							"name": "wordpress",
+							"name": "web",
 							"taskArn": "arn:aws:ecs:us-east-1:012345678910:task/d8c67b3c-ac87-4ffe-a847-4785bc3a8b55"
 						}
 					],
@@ -1244,6 +1266,30 @@ var cycleProcessDockerListContainers3 = awsutil.Cycle{
 	},
 }
 
+var cycleProcessDockerListContainers4 = awsutil.Cycle{
+	Request: awsutil.Request{
+		Method:     "GET",
+		RequestURI: "/containers/json?all=1&filters=%7B%22label%22%3A%5B%22com.amazonaws.ecs.task-arn%3Darn%3Aaws%3Aecs%3Aus-east-1%3A778743527532%3Atask%2F50b8de99-f94f-4ecd-a98f-5850760f0845%22%5D%2C%22name%22%3A%5B%22web%22%5D%7D",
+		Body:       ``,
+	},
+	Response: awsutil.Response{
+		StatusCode: 200,
+		Body: `[
+			{
+				"Id": "8dfafdbc3a40",
+				"Names":["/boring_feynman"],
+				"Image": "ubuntu:latest",
+				"ImageID": "d74508fb6632491cea586a1fd7d748dfc5274cd6fdfedee309ecdcbc2bf5cb82",
+				"Command": "echo 1",
+				"Created": 1367854155,
+				"State": "Exited",
+				"Status": "Exit 0",
+				"Ports": [{"PrivatePort": 2222, "PublicPort": 3333, "Type": "tcp"}]
+			}
+		]`,
+	},
+}
+
 var cycleProcessDockerInspect = awsutil.Cycle{
 	Request: awsutil.Request{
 		Method:     "GET",
@@ -1252,11 +1298,17 @@ var cycleProcessDockerInspect = awsutil.Cycle{
 	Response: awsutil.Response{
 		StatusCode: 200,
 		Body: `{
+			"Id": "8dfafdbc3a40",
+			"ID": "8dfafdbc3a40",
 			"Config": {
 				"Cmd": [
 						"ls",
 						"-la"
-				]
+				],
+				"Labels": {
+						"com.amazonaws.ecs.container-name": "web",
+						"convox.group": "web"
+				}
 			}
 		}`,
 	},
