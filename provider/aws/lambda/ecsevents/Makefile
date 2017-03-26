@@ -18,6 +18,7 @@ release: lambda.zip
 
 devrelease: lambda.zip
 	aws s3 cp lambda.zip s3://$(DEV_RACK_SETTINGS_BUCKET)/dev/release/$(VERSION)/lambda/ecsevents.zip --acl public-read --region $(DEV_RACK_REGION)
+	make clean
 
 upload: lambda.zip
 	bin/upload $(RACK)
