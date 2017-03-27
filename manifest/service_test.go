@@ -92,3 +92,16 @@ func TestSyncPaths(t *testing.T) {
 		}
 	}
 }
+
+func TestGroupName(t *testing.T) {
+	m, err := manifestFixture("group")
+	if err != nil {
+		assert.FailNow(t, fmt.Sprintf("failed to read fixture: %s", err.Error()))
+	}
+	webService := m.Services["web"]
+	reverseProxyService := m.Services["reverse-proxy"]
+	workerService := m.Services["worker"]
+	assert.Equal(t, "web", webService.GroupName())
+	assert.Equal(t, "web", reverseProxyService.GroupName())
+	assert.Equal(t, "worker", workerService.GroupName())
+}
