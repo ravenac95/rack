@@ -105,3 +105,15 @@ func TestGroupName(t *testing.T) {
 	assert.Equal(t, "web", reverseProxyService.GroupName())
 	assert.Equal(t, "worker", workerService.GroupName())
 }
+
+func TestUseSecureEnvironment(t *testing.T) {
+	m, err := manifestFixture("secure-env")
+	if err != nil {
+		assert.FailNow(t, fmt.Sprintf("failed to read fixture: %s", err.Error()))
+	}
+	secureService := m.Services["secure"]
+	notSecureService := m.Services["notsecure"]
+
+	assert.True(t, secureService.UseSecureEnvironment())
+	assert.False(t, notSecureService.UseSecureEnvironment())
+}
