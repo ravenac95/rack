@@ -304,6 +304,7 @@ func (r *Release) Promote() error {
 		}
 	}
 
+	// Enable the formations for all service groups
 	for _, group := range m.ServiceGroups() {
 		app.Parameters[group.ParamName("Formation")] = "1"
 	}
