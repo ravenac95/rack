@@ -14,6 +14,7 @@
     "Parameters" : {
       {{ template "balancer-params" .Manifest }}
       {{ template "process-params" .Manifest }}
+      {{ template "group-params" .Manifest }}
 
       "Cluster": {
         "Type" : "String",
@@ -224,6 +225,16 @@
   {{ end }}
 {{ end }}
 
+{{ define "group-params" }}
+  {{ range $group := .ServiceGroups }}
+    "{{ upper $group.Name }}GroupFormation": {
+      "Type": "Number",
+      "Default": 1,
+      "Description": "Number of processes to run"
+    },
+  {{ end }}
+{{ end }}
+
 {{ define "process-outputs" }}
   "LogGroup": {
     "Value": { "Ref": "LogGroup" }
@@ -240,8 +251,8 @@
   {{ $manifest := .Manifest }}
   {{ $app := .App }}
   {{ if $manifest.HasProcesses }}
-    {{ range $e := $manifest.Services }}
-      "{{ upper $e.Name }}ECSTaskDefinition": {
+    {{ range $group := $manifest.ServiceGroups }}
+      "{{ upper $group.Name }}GroupECSTaskDefinition": {
         "DependsOn": ["CustomTopic", "ServiceRole"],
         "Type": "Custom::ECSTaskDefinition",
         "Version": "1.0",
@@ -252,101 +263,112 @@
             "TaskRole": { "Ref": "TaskRole" },
           {{ end }}
           "ServiceToken": { "Fn::GetAtt": [ "CustomTopic", "Arn" ] },
-          "Name": { "Fn::Join": [ "-", [ { "Ref": "AWS::StackName" }, "{{ $e.Name }}" ] ] },
+          "Name": { "Fn::Join": [ "-", [ { "Ref": "AWS::StackName" }, "{{ $group.Name }}" ] ] },
           "Release": { "Ref": "Release" },
           "Environment": { "Ref": "Environment" },
           "Key": { "Ref": "Key" },
           "Tasks": [
-            {
-              "Name": "{{ $e.Name }}",
-              "Image": "{{ $e.Image }}",
-              "SecureEnvironment": {{ if $e.UseSecureEnvironment }}true{{ else }}false{{ end }},
-              {{if $e.Command.Array}}
-                "Command": [
-                  {{ range $index, $element := $e.Command.Array}}
-                      {{if $index}},{{else}}{{end}}
-                      "{{$element}}"
-                  {{end}}
-                ],
-              {{else if ne $e.Command.String ""}}
-                "Command": {{ value $e.Command.String }},
-              {{end}}
-              "Cpu": { "Fn::Select": [ 1, { "Ref": "{{ upper $e.Name }}Formation" } ] },
-              "Memory": { "Fn::Select": [ 2, { "Ref": "{{ upper $e.Name }}Formation" } ] },
-              "Environment": {
-                "APP": "{{ $.App.Name }}",
-                "RACK": "{{ env "RACK" }}",
-                "AWS_REGION": "{{ env "AWS_REGION" }}",
-                "LOG_GROUP": { "Fn::If": [ "NativeLogging",
-                  { "Ref" : "AWS::NoValue" },
-                  { "Ref": "LogGroup" }
-                ] },
-                {{ range $e.Environment }}
-                  {{ if ne .Value "" }}
-                    "{{ .Name }}": {{ value .Value }},
+            {{ range $serviceIndex, $e := $group.Services }}
+              {{ if $serviceIndex }},{{ else }}{{ end }}
+              {
+                "Name": "{{ $e.Name }}",
+                "Image": "{{ $e.Image }}",
+                "SecureEnvironment": {{ if $e.UseSecureEnvironment }}true{{ else }}false{{ end }},
+                {{if $e.Command.Array}}
+                  "Command": [
+                    {{ range $index, $element := $e.Command.Array}}
+                        {{if $index}},{{else}}{{end}}
+                        "{{$element}}"
+                    {{end}}
+                  ],
+                {{else if ne $e.Command.String ""}}
+                  "Command": {{ value $e.Command.String }},
+                {{end}}
+                "Cpu": { "Fn::Select": [ 1, { "Ref": "{{ upper $e.Name }}Formation" } ] },
+                "Memory": { "Fn::Select": [ 2, { "Ref": "{{ upper $e.Name }}Formation" } ] },
+                "Environment": {
+                  "APP": "{{ $.App.Name }}",
+                  "RACK": "{{ env "RACK" }}",
+                  "AWS_REGION": "{{ env "AWS_REGION" }}",
+                  "LOG_GROUP": { "Fn::If": [ "NativeLogging",
+                    { "Ref" : "AWS::NoValue" },
+                    { "Ref": "LogGroup" }
+                  ] },
+                  {{ range $e.Environment }}
+                    {{ if ne .Value "" }}
+                      "{{ .Name }}": {{ value .Value }},
+                    {{ end }}
                   {{ end }}
-                {{ end }}
-                {{ range $key, $value := .LinkVars }}
-                  "{{ $key }}": {{ $value }},
-                {{ end }}
-                "PROCESS": "{{ $e.Name }}"
-              },
-              "Volumes": [
-                {{ range $e.MountableVolumes }}
-                  {{ if .IsSystem }}
-                    "{{.Host}}:{{.Container}}",
-                  {{ else }}
-                    { "Fn::Join": [ "", [ "/volumes/", { "Ref": "AWS::StackName" }, "/{{$e.Name}}{{.Host}}:{{.Container}}" ] ] },
+                  {{ range $key, $value := .LinkVars }}
+                    "{{ $key }}": {{ $value }},
                   {{ end }}
-                {{ end }}
-                { "Ref" : "AWS::NoValue" }
-              ],
-              "ExtraHosts": [
-                {{ range $key, $value := $e.ExtraHostsMap }}
-                  {
-                    "HostName": "{{ $key }}",
-                    "IpAddress": "{{ $value }}"
-                  },
-                {{ end }}
-                { "Ref" : "AWS::NoValue" }
-              ],
-              "Services": [
-                { "Ref" : "AWS::NoValue" }
-              ],
-              "PortMappings": [
-                {{ range .Ports }}
-                  {{ if and (eq .Protocol "tcp") ($e.HasBalancer) }}
-                  { "Fn::Join": [ ":", [
-                    { "Ref": "{{ upper $e.Name }}Port{{ .Balancer }}Host" },
-                      "{{ .Container }}/{{ .Protocol }}"
-                  ] ] },
-                  {{ else }}
-                    "{{ .Balancer }}:{{ .Container }}/{{ .Protocol }}",
-                  {{ end }}
-                {{ end }}
-                { "Ref" : "AWS::NoValue" }
-              ],
-              "Privileged": "{{ $e.Privileged }}",
-              "LogConfiguration": { "Fn::If": [ "NativeLogging",
-                {
-                  "LogDriver": "awslogs",
-                  "Options": {
-                    "awslogs-region": { "Ref": "AWS::Region" },
-                    "awslogs-group": { "Ref": "LogGroup" },
-                    "awslogs-stream-prefix": "convox"
-                  }
+                  "PROCESS": "{{ $e.Name }}"
                 },
-                { "Ref" : "AWS::NoValue" }
-              ] }
-            }
+                "Volumes": [
+                  {{ range $e.MountableVolumes }}
+                    {{ if .IsSystem }}
+                      "{{.Host}}:{{.Container}}",
+                    {{ else }}
+                      { "Fn::Join": [ "", [ "/volumes/", { "Ref": "AWS::StackName" }, "/{{$e.Name}}{{.Host}}:{{.Container}}" ] ] },
+                    {{ end }}
+                  {{ end }}
+                  { "Ref" : "AWS::NoValue" }
+                ],
+                "ExtraHosts": [
+                  {{ range $key, $value := $e.ExtraHostsMap }}
+                    {
+                      "HostName": "{{ $key }}",
+                      "IpAddress": "{{ $value }}"
+                    },
+                  {{ end }}
+                  { "Ref" : "AWS::NoValue" }
+                ],
+                "Services": [
+                  { "Ref" : "AWS::NoValue" }
+                ],
+                "PortMappings": [
+                  {{ range .Ports }}
+                    {{ if and (eq .Protocol "tcp") ($e.HasBalancer) }}
+                      { "Fn::Join": [ ":", [
+                        { "Ref": "{{ upper $e.Name }}Port{{ .Balancer }}Host" },
+                        "{{ .Container }}/{{ .Protocol }}"
+                      ] ] },
+                    {{ else }}
+                      "{{ .Balancer }}:{{ .Container }}/{{ .Protocol }}",
+                    {{ end }}
+                  {{ end }}
+                  { "Ref" : "AWS::NoValue" }
+                ],
+                "Privileged": "{{ $e.Privileged }}",
+                "LogConfiguration": { "Fn::If": [ "NativeLogging",
+                  {
+                    "LogDriver": "awslogs",
+                    "Options": {
+                      "awslogs-region": { "Ref": "AWS::Region" },
+                      "awslogs-group": { "Ref": "LogGroup" },
+                      "awslogs-stream-prefix": "convox"
+                    }
+                  },
+                  { "Ref" : "AWS::NoValue" }
+                ] },
+                "Links": [
+                  {{ range $linkIndex, $link := $group.Links $e.Name }}
+                    {{ if $linkIndex}},{{ else }} {{ end }}
+                    "{{ $link }}"
+                  {{ end }}
+                ]
+              }
+            {{ end }}
           ]
         }
       },
-      "Service{{ upper $e.Name }}": {
-        "Condition": "Enabled{{ upper $e.Name }}",
+      "Service{{ upper $group.Name }}": {
+        "Condition": "Enabled{{ upper $group.Name }}",
         "DependsOn": [
-          {{ if $e.HasBalancer }}
-            "{{ $manifest.BalancerResourceName $e.Name }}",
+          {{ range $serviceIndex, $e := $group.Services }}
+            {{ if $e.HasBalancer }}
+              "{{ $manifest.BalancerResourceName $e.Name }}",
+            {{ end }}
           {{ end }}
           "CustomTopic",
           "ServiceRole"
@@ -355,21 +377,26 @@
         "Properties": {
           "Cluster": { "Ref": "Cluster" },
           "DeploymentConfiguration": {
-            "MinimumHealthyPercent": "{{ $e.DeploymentMinimum }}",
-            "MaximumPercent": "{{ $e.DeploymentMaximum }}"
+            "MinimumHealthyPercent": "{{ $group.DeploymentMinimum }}",
+            "MaximumPercent": "{{ $group.DeploymentMaximum }}"
           },
-          "DesiredCount": { "Fn::Select": [ 0, { "Ref": "{{ upper $e.Name }}Formation" } ] },
-          {{ if $e.HasBalancer }}
+          "DesiredCount": { "Ref": "{{ upper $group.Name }}GroupFormation" },
+          {{ if $group.HasBalancer }}
             "LoadBalancers": [
-              {
-                "ContainerName": "{{ $e.Name }}",
-                "ContainerPort": "{{ (index $e.TCPPorts 0).Container }}",
-                "LoadBalancerName": { "Ref": "{{ $manifest.BalancerResourceName $e.Name }}" }
-              }
+              {{ range $serviceIndex, $e := $group.ServicesWithLoadBalancers }}
+                {{ if $serviceIndex }},{{ else }} {{ end }}
+                {{ if $e.HasBalancer }}
+                  {
+                    "ContainerName": "{{ $e.Name }}",
+                    "ContainerPort": "{{ (index $e.Ports 0).Container }}",
+                    "LoadBalancerName": { "Ref": "{{ $manifest.BalancerResourceName $e.Name }}" }
+                  }
+                {{ end }}
+              {{ end }}
             ],
             "Role": { "Fn::GetAtt": [ "ServiceRole", "Arn" ] },
           {{ end }}
-          "TaskDefinition": { "Ref": "{{ upper $e.Name }}ECSTaskDefinition" }
+          "TaskDefinition": { "Ref": "{{ upper $group.Name }}GroupECSTaskDefinition" }
         }
       },
     {{ end }}
