@@ -497,6 +497,7 @@ func (s Service) ParamName(name string) string {
 	return fmt.Sprintf("%s%s", UpperName(s.Name), name)
 }
 
+// GroupName - Gets the group name for the current service
 func (s Service) GroupName() string {
 	if groupName, ok := s.Labels["convox.group"]; ok {
 		return groupName
