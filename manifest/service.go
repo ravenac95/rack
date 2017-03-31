@@ -497,6 +497,13 @@ func (s Service) ParamName(name string) string {
 	return fmt.Sprintf("%s%s", UpperName(s.Name), name)
 }
 
+func (s Service) GroupName() string {
+	if groupName, ok := s.Labels["convox.group"]; ok {
+		return groupName
+	}
+	return s.Name
+}
+
 func (s Service) RegistryImage(appName, buildId string, outputs map[string]string) string {
 	if registryId := outputs["RegistryId"]; registryId != "" {
 		return fmt.Sprintf("%s.dkr.ecr.%s.amazonaws.com/%s:%s.%s", registryId, os.Getenv("AWS_REGION"), outputs["RegistryRepository"], s.Name, buildId)
