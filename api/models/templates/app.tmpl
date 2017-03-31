@@ -6,6 +6,7 @@
     "Conditions": {
       {{ template "balancer-conditions" .Manifest }}
       {{ template "process-conditions" .Manifest }}
+      {{ template "group-conditions" .Manifest }}
       "Internal": { "Fn::Equals": [ { "Ref": "Internal" }, "Yes" ] },
       "NativeLogging": { "Fn::Equals": [ { "Ref": "NativeLogging" }, "Yes" ] },
       "Private": { "Fn::Equals": [ { "Ref": "Private" }, "Yes" ] },
@@ -181,6 +182,12 @@
   {{ end }}
 {{ end }}
 
+{{ define "group-conditions" }}
+  {{ range $group := .ServiceGroups }}
+    "Enabled{{ upper $group.Name }}Group": { "Fn::Not": [{ "Fn::Equals": [ { "Ref": "{{ upper $group.Name }}GroupFormation" }, "-1" ] }] },
+  {{ end }}
+{{ end }}
+
 {{ define "process-params" }}
   {{ range $e := .Services }}
     "{{ upper $e.Name }}Formation": {
@@ -310,7 +317,7 @@
         }
       },
       "Service{{ upper $group.Name }}": {
-        "Condition": "Enabled{{ upper $group.Name }}",
+        "Condition": "Enabled{{ upper $group.Name }}Group",
         "DependsOn": [
           {{ range $serviceIndex, $e := $group.Services }}
             {{ if $e.HasBalancer }}
