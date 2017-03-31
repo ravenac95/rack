@@ -1,4 +1,4 @@
-// build devtools
+// +build devtools
 
 package main
 
