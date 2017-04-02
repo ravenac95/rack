@@ -457,13 +457,18 @@
     },
     "LambdaBucket": {
       "Type": "String",
-      "Description": "The base to the s3 bucket for the lambda code",
+      "Description": "For development: The base to the s3 bucket for the lambda code",
       "Default": ""
     },
     "LambdaKeyPrefix": {
       "Type": "String",
       "Description": "The key prefix for the lambda code. Generally should be `dev/`",
       "Default": ""
+    },
+    "LambdaCustomReleaseBucketPrefix": {
+      "Type": "String",
+      "Description": "For preparing a custom lambda release",
+      "Default": "convox"
     }
   },
   "Resources": {
@@ -643,7 +648,7 @@
       "Type": "AWS::Lambda::Function",
       "Properties": {
         "Code": {
-          "S3Bucket": { "Fn::If": ["BlankLambdaBucket", { "Fn::Join": [ "-", [ "convox", { "Ref": "AWS::Region" } ] ] }, {"Ref": "LambdaBucket"} ] },
+          "S3Bucket": { "Fn::If": ["BlankLambdaBucket", { "Fn::Join": [ "-", [ {"Ref": "LambdaCustomReleaseBucketPrefix"}, { "Ref": "AWS::Region" } ] ] }, {"Ref": "LambdaBucket"} ] },
           "S3Key": { "Fn::Join": [ "", [ {"Ref": "LambdaKeyPrefix"}, "release/", { "Ref": "Version" }, "/lambda/formation.zip" ] ] }
         },
         "Description": "Convox handler for custom resources",
@@ -1811,7 +1816,7 @@
       "Type": "AWS::Lambda::Function",
       "Properties": {
         "Code": {
-          "S3Bucket": { "Fn::If": ["BlankLambdaBucket", { "Fn::Join": [ "-", [ "convox", { "Ref": "AWS::Region" } ] ] }, {"Ref": "LambdaBucket"} ] },
+          "S3Bucket": { "Fn::If": ["BlankLambdaBucket", { "Fn::Join": [ "-", [ {"Ref": "LambdaCustomReleaseBucketPrefix"}, { "Ref": "AWS::Region" } ] ] }, {"Ref": "LambdaBucket"} ] },
           "S3Key": { "Fn::Join": [ "", [ {"Ref": "LambdaKeyPrefix"}, "release/", { "Ref": "Version" }, "/lambda/lifecycle.zip" ] ] }
         },
         "Description": { "Fn::Join": [ "", [ "{\"Cluster\": \"", { "Ref": "Cluster" }, "\", \"Rack\": \"", { "Ref": "AWS::StackName" }, "\"}" ] ] },
