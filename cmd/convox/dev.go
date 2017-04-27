@@ -20,6 +20,8 @@ import (
 
 	"regexp"
 
+	"bufio"
+
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/awserr"
 	"github.com/aws/aws-sdk-go/aws/session"
@@ -29,6 +31,7 @@ import (
 	"github.com/aws/aws-sdk-go/service/s3"
 	"github.com/convox/rack/client"
 	"github.com/convox/rack/cmd/convox/stdcli"
+	"github.com/convox/version"
 	"gopkg.in/urfave/cli.v1"
 )
 
@@ -45,6 +48,10 @@ var envKeyReplaceRegex = regexp.MustCompile("(.)([A-Z])")
 type DevRackChange struct {
 	ChangeType string
 	Options    map[string]string
+}
+
+type CloudformationTemplate struct {
+	Parameters map[string]interface{} `json:"Parameters"`
 }
 
 type DevRack struct {
@@ -369,10 +376,15 @@ func (d *DevRack) CommitRackChanges() error {
 		UsePreviousValue: aws.Bool(false),
 	}
 
+	currentTemplate, err := d.downloadCurrentRackFormation()
+
 	var parameters []*cloudformation.Parameter
 
-	for _, parameter := range parametersMap {
-		parameters = append(parameters, parameter)
+	for parameterName, parameter := range parametersMap {
+		// Only include defined input parameters
+		if _, isDefined := currentTemplate.Parameters[parameterName]; isDefined {
+			parameters = append(parameters, parameter)
+		}
 	}
 
 	params := cloudformation.UpdateStackInput{
@@ -382,8 +394,32 @@ func (d *DevRack) CommitRackChanges() error {
 		Parameters:       parameters,
 		TemplateURL:      aws.String(d.RackSettings.ConvoxFormationURL),
 	}
-	_, err := d.cf().UpdateStack(&params)
+	_, err = d.cf().UpdateStack(&params)
 	return err
+}
+
+func (d *DevRack) downloadCurrentRackFormation() (*CloudformationTemplate, error) {
+	resp, err := http.Get(d.RackSettings.ConvoxFormationURL)
+	if err != nil {
+		return nil, err
+	}
+
+	defer resp.Body.Close()
+
+	body, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return nil, err
+	}
+
+	var formation CloudformationTemplate
+
+	err = json.Unmarshal(body, &formation)
+
+	if err != nil {
+		return nil, err
+	}
+
+	return &formation, nil
 }
 
 func (d *DevRack) cfStackParametersMapForUpdate() map[string]*cloudformation.Parameter {
@@ -520,6 +556,54 @@ func init() {
 				Action:      cmdSetupEnvironment,
 				Flags:       []cli.Flag{rackFlag},
 			},
+			{
+				Name:        "setup-custom-release",
+				Description: "Sets up the s3 buckets for a custom release",
+				Action:      cmdSetupCustomReleaseBuckets,
+				Flags: []cli.Flag{
+					cli.StringFlag{
+						Name:  "custom-release-name",
+						Usage: "The custom release name",
+					},
+				},
+			},
+			{
+				Name:        "deploy-custom-release",
+				Description: "Deploys local changes as a custom convox release",
+				Action:      cmdDeployCustomRelease,
+				Flags: []cli.Flag{
+					cli.BoolFlag{
+						Name:  "publish",
+						Usage: "Publishes the release immediately",
+					},
+					cli.StringFlag{
+						Name:  "custom-release-name",
+						Usage: "The custom release name",
+					},
+					cli.StringFlag{
+						Name:  "build-image-tag",
+						Usage: "The tag for the build image",
+					},
+					cli.StringFlag{
+						Name:  "api-image-tag",
+						Usage: "The tag for the api image",
+					},
+				},
+			},
+			{
+				Name:   "publish-custom-release",
+				Action: cmdPublishCustomReleaseVersion,
+				Flags: []cli.Flag{
+					cli.StringFlag{
+						Name:  "custom-release-name",
+						Usage: "The custom release name",
+					},
+					cli.BoolFlag{
+						Name:  "required",
+						Usage: "Set this version to a required version",
+					},
+				},
+			},
 		},
 	})
 }
@@ -546,16 +630,16 @@ func cmdDeployLocalChanges(c *cli.Context) error {
 
 	now := time.Now()
 	// VERSION = YYYYmmddHHMMSS
-	version := now.UTC().Format("20060102150405")
+	versionName := now.UTC().Format("20060102150405")
 
 	var env []string
 	env = append(env, fmt.Sprintf("CONVOX_BUILDER_TAG=%s", devRack.RackSettings.ConvoxBuildRepositoryURI))
-	env = append(env, fmt.Sprintf("CONVOX_BUILDER_TAG_VERSION=%s", version))
+	env = append(env, fmt.Sprintf("CONVOX_BUILDER_TAG_VERSION=%s", versionName))
 	env = append(env, fmt.Sprintf("CONVOX_API_TAG=%s", devRack.RackSettings.ConvoxAPIRepositoryURI))
-	env = append(env, fmt.Sprintf("CONVOX_API_TAG_VERSION=%s", version))
+	env = append(env, fmt.Sprintf("CONVOX_API_TAG_VERSION=%s", versionName))
 	env = append(env, fmt.Sprintf("DEV_RACK_SETTINGS_BUCKET=%s", devRack.SettingsBucket()))
 	env = append(env, fmt.Sprintf("DEV_RACK_REGION=%s", devRack.Region))
-	env = append(env, fmt.Sprintf("VERSION=%s", version))
+	env = append(env, fmt.Sprintf("VERSION=%s", versionName))
 
 	convoxDir, err := getConvoxDir()
 
@@ -564,13 +648,13 @@ func cmdDeployLocalChanges(c *cli.Context) error {
 		return err
 	}
 
-	err = devRack.UpdateConvoxFormationURL(version)
+	err = devRack.UpdateConvoxFormationURL(versionName)
 	if err != nil {
 		return err
 	}
 
-	devRack.UpdateAPIImage(version)
-	devRack.UpdateBuildImage(version)
+	devRack.UpdateAPIImage(versionName)
+	devRack.UpdateBuildImage(versionName)
 	return devRack.CommitRackChanges()
 }
 
@@ -636,4 +720,227 @@ func cmdSetupEnvironment(c *cli.Context) error {
 	fmt.Printf("$ convox login localhost -p %s\n", devRack.Env["Password"])
 
 	return nil
+}
+
+func inputQuestion(messages string) (string, error) {
+	reader := bufio.NewReader(os.Stdin)
+	fmt.Printf("%s: ", messages)
+	return reader.ReadString('\n')
+}
+
+func cmdSetupCustomReleaseBuckets(c *cli.Context) error {
+	fmt.Println("Setting infrastructure to deploy custom convox releases")
+	fmt.Println("")
+	customReleaseName := c.String("custom-release-name")
+	if customReleaseName == "" {
+		return fmt.Errorf("--custom-release-name is required")
+	}
+
+	convoxDir, err := getConvoxDir()
+	if err != nil {
+		return err
+	}
+
+	regionsFile, err := os.Open(path.Join(convoxDir, "REGIONS"))
+	if err != nil {
+		return err
+	}
+
+	defer regionsFile.Close()
+
+	scanner := bufio.NewScanner(regionsFile)
+	for scanner.Scan() {
+		region := scanner.Text()
+		session, err := session.NewSession(&aws.Config{
+			Region: aws.String(region),
+		})
+		if err != nil {
+			return err
+		}
+
+		service := s3.New(session)
+
+		bucketName := fmt.Sprintf("%s-%s", customReleaseName, region)
+
+		params := s3.CreateBucketInput{
+			Bucket: aws.String(bucketName),
+		}
+
+		_, err = service.CreateBucket(&params)
+		if err != nil {
+			if awsErr, ok := err.(awserr.Error); ok {
+				switch awsErr.Code() {
+				case s3.ErrCodeBucketAlreadyExists:
+					fmt.Printf("Already created %s\n. Skipping", bucketName)
+					continue
+				}
+			}
+			return err
+		}
+	}
+	session, err := session.NewSession(&aws.Config{
+		Region: aws.String("us-east-1"),
+	})
+	if err != nil {
+		return err
+	}
+
+	params := s3.CreateBucketInput{
+		Bucket: aws.String(customReleaseName),
+	}
+
+	// Create the base bucket
+	service := s3.New(session)
+
+	_, err = service.CreateBucket(&params)
+	return err
+}
+
+func setConvoxCustomReleaseFromContext(c *cli.Context) (string, error) {
+	customReleaseName := c.String("custom-release-name")
+	if customReleaseName == "" {
+		return "", fmt.Errorf("--custom-release-name is required")
+	}
+
+	return customReleaseName, setConvoxCustomReleaseFromString(customReleaseName)
+}
+
+func setConvoxCustomReleaseFromString(customReleaseName string) error {
+	err := os.Setenv("CONVOX_CUSTOM_RELEASE", customReleaseName)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func cmdDeployCustomRelease(c *cli.Context) error {
+	builderTag := c.String("build-image-tag")
+	customReleaseName := c.String("custom-release-name")
+	apiTag := c.String("api-image-tag")
+
+	if builderTag == "" || customReleaseName == "" || apiTag == "" {
+		return fmt.Errorf("All of the following options are required: --build-image-tag, --custom-release-name, --api-image-tag")
+	}
+
+	err := setConvoxCustomReleaseFromString(customReleaseName)
+	if err != nil {
+		return err
+	}
+
+	err = os.Setenv("AWS_DEFAULT_REGION", "us-east-1")
+	if err != nil {
+		return err
+	}
+
+	commandTable := ShellCommandList{
+		ShellCommand{cmd: "make", args: []string{"builder"}},
+		ShellCommand{cmd: "make", args: []string{"release"}},
+		ShellCommand{cmd: "make", args: []string{"clean"}},
+	}
+
+	now := time.Now()
+	// VERSION = YYYYmmddHHMMSS
+	versionName := now.UTC().Format("20060102150405")
+
+	var env []string
+	env = append(env, fmt.Sprintf("CONVOX_BUILDER_TAG=%s", builderTag))
+	env = append(env, fmt.Sprintf("CONVOX_BUILDER_TAG_VERSION=%s", versionName))
+	env = append(env, fmt.Sprintf("CONVOX_API_TAG=%s", apiTag))
+	env = append(env, fmt.Sprintf("CONVOX_API_TAG_VERSION=%s", versionName))
+	env = append(env, fmt.Sprintf("CONVOX_CUSTOM_RELEASE=%s", customReleaseName))
+	env = append(env, fmt.Sprintf("VERSION=%s", versionName))
+
+	convoxDir, err := getConvoxDir()
+	if err != nil {
+		return err
+	}
+
+	err = commandTable.Execute(convoxDir, env)
+	if err != nil {
+		return err
+	}
+
+	releaseSettings := ReleaseSettings{
+		ConvoxAPIRepositoryURI:   apiTag,
+		ConvoxBuildRepositoryURI: builderTag,
+	}
+
+	jsonReleaseSettings, err := json.Marshal(releaseSettings)
+	if err != nil {
+		return err
+	}
+
+	// Upload ReleaseSettings to the "main" bucket in us-east-1
+	session, err := session.NewSession(&aws.Config{
+		Region: aws.String("us-east-1"),
+	})
+	if err != nil {
+		return err
+	}
+
+	params := s3.PutObjectInput{
+		Bucket:      aws.String(customReleaseName),
+		Key:         aws.String(fmt.Sprintf("release/%s/settings.json", versionName)),
+		Body:        bytes.NewReader(jsonReleaseSettings),
+		ContentType: aws.String("application/json"),
+		ACL:         aws.String("public-read"),
+	}
+
+	// Create the base bucket
+	service := s3.New(session)
+
+	_, err = service.PutObject(&params)
+	if err != nil {
+		return err
+	}
+
+	newVersion := version.Version{
+		Version:     versionName,
+		Description: fmt.Sprintf("Version %s", versionName),
+		Published:   false,
+		Required:    false,
+	}
+
+	_, err = version.AppendVersion(newVersion)
+	if err != nil {
+		return err
+	}
+	if c.Bool("publish") {
+		return publishCustomReleaseVersion(customReleaseName, versionName, false)
+	}
+	return err
+}
+
+func publishCustomReleaseVersion(customReleaseName string, versionName string, required bool) error {
+	err := setConvoxCustomReleaseFromString(customReleaseName)
+	if err != nil {
+		return err
+	}
+
+	err = os.Setenv("AWS_DEFAULT_REGION", "us-east-1")
+	if err != nil {
+		return err
+	}
+
+	newVersion := version.Version{
+		Version:     versionName,
+		Description: fmt.Sprintf("Version %s", versionName),
+		Published:   true,
+		Required:    required,
+	}
+	_, err = version.UpdateVersion(newVersion)
+	return err
+}
+
+func cmdPublishCustomReleaseVersion(c *cli.Context) error {
+	customReleaseName, err := setConvoxCustomReleaseFromContext(c)
+	if err != nil {
+		return err
+	}
+
+	versionName := c.Args().Get(0)
+
+	required := c.Bool("required")
+
+	return publishCustomReleaseVersion(customReleaseName, versionName, required)
 }

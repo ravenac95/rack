@@ -17,7 +17,12 @@
       {{ template "balancer-params" .Manifest }}
       {{ template "process-params" .Manifest }}
       {{ template "group-params" .Manifest }}
-
+      
+      "ConvoxCustomRelease": {
+        "Type": "String",
+        "Description": "The string used to determine a custom release",
+        "Default": "convox"
+      },
       "LambdaBucket": {
         "Type": "String",
         "Description": "The base to the s3 bucket for the lambda code",
@@ -155,7 +160,7 @@
         "Type": "AWS::Lambda::Function",
         "Properties": {
           "Code": {
-            "S3Bucket": { "Fn::If": ["BlankLambdaBucket", { "Fn::Join": [ "-", [ "convox", { "Ref": "AWS::Region" } ] ] }, {"Ref": "LambdaBucket"} ] },
+            "S3Bucket": { "Fn::If": ["BlankLambdaBucket", { "Fn::Join": [ "-", [ {"Ref": "ConvoxCustomRelease"}, { "Ref": "AWS::Region" } ] ] }, {"Ref": "LambdaBucket"} ] },
             "S3Key": { "Fn::Join": [ "", [ {"Ref": "LambdaKeyPrefix"}, "release/", { "Ref": "Version" }, "/lambda/formation.zip" ] ] }
           },
           "Handler": "index.external",

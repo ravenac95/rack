@@ -55,7 +55,8 @@ install/uninstall process and then delete them once the installer has completed.
 
 var (
 	distinctID         = ""
-	formationURL       = "https://convox.s3.amazonaws.com/release/%s/formation.json"
+	formationURL       = "https://%s.s3.amazonaws.com/release/%s/formation.json"
+	releaseSettingsURL = "https://%s.s3.amazonaws.com/release/%s/settings.json"
 	defaultSubnetCIDRs = "10.0.1.0/24,10.0.2.0/24,10.0.3.0/24"
 	defaultVPCCIDR     = "10.0.0.0/16"
 )
@@ -79,6 +80,12 @@ func init() {
 				EnvVar: "PASSWORD",
 				Value:  "",
 				Usage:  "custom rack password",
+			},
+			cli.StringFlag{
+				Name:   "custom-release-name",
+				EnvVar: "CONVOX_CUSTOM_RELEASE",
+				Value:  "convox",
+				Usage:  "Custom release value is used to determine custom release bucket. Only use if you know what you're doing",
 			},
 			cli.StringFlag{
 				Name:  "ami",
@@ -161,7 +168,43 @@ func init() {
 	})
 }
 
+type ReleaseSettings struct {
+	ConvoxAPIRepositoryURI   string `json:"convox_api_repository_uri"`
+	ConvoxBuildRepositoryURI string `json:"convox_build_repository_uri"`
+}
+
+func downloadReleaseSettings(customReleaseName string, versionString string) (*ReleaseSettings, error) {
+	url := fmt.Sprintf(releaseSettingsURL, customReleaseName, versionString)
+	resp, err := http.Get(url)
+	if err != nil {
+		return nil, err
+	}
+
+	defer resp.Body.Close()
+
+	data, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return nil, err
+	}
+
+	var settings ReleaseSettings
+
+	err = json.Unmarshal(data, &settings)
+	if err != nil {
+		return nil, err
+	}
+	return &settings, nil
+}
+
 func cmdInstall(c *cli.Context) error {
+	customReleaseName := c.String("custom-release-name")
+	if customReleaseName != "" {
+		err := os.Setenv("CONVOX_CUSTOM_RELEASE", customReleaseName)
+		if err != nil {
+			return err
+		}
+	}
+
 	ep := stdcli.QOSEventProperties{Start: time.Now()}
 
 	var err error
@@ -284,7 +327,7 @@ func cmdInstall(c *cli.Context) error {
 	}
 
 	versionName := version.Version
-	furl := fmt.Sprintf(formationURL, versionName)
+	furl := fmt.Sprintf(formationURL, customReleaseName, versionName)
 
 	fmt.Println(Banner)
 
@@ -371,6 +414,7 @@ func cmdInstall(c *cli.Context) error {
 			{ParameterKey: aws.String("SubnetPrivate1CIDR"), ParameterValue: aws.String(subnetPrivate1CIDR)},
 			{ParameterKey: aws.String("SubnetPrivate2CIDR"), ParameterValue: aws.String(subnetPrivate2CIDR)},
 			{ParameterKey: aws.String("VPCCIDR"), ParameterValue: aws.String(vpcCIDR)},
+			{ParameterKey: aws.String("ConvoxCustomRelease"), ParameterValue: aws.String(customReleaseName)},
 		},
 		StackName:   aws.String(stackName),
 		TemplateURL: aws.String(furl),
@@ -390,6 +434,25 @@ func cmdInstall(c *cli.Context) error {
 			ParameterValue: aws.String(c.String("build-instance")),
 		}
 		req.Parameters = append(req.Parameters, p)
+	}
+
+	if customReleaseName != "convox" {
+		fmt.Printf("Loading Release settings for Custom Release '%s'", customReleaseName)
+		releaseSettings, err := downloadReleaseSettings(customReleaseName, versionName)
+		if err != nil {
+			return stdcli.Error(err)
+		}
+
+		apiParam := &cloudformation.Parameter{
+			ParameterKey:   aws.String("ConvoxApiImage"),
+			ParameterValue: aws.String(releaseSettings.ConvoxAPIRepositoryURI),
+		}
+		buildParam := &cloudformation.Parameter{
+			ParameterKey:   aws.String("BuildImage"),
+			ParameterValue: aws.String(fmt.Sprintf("%s:%s", releaseSettings.ConvoxBuildRepositoryURI, versionName)),
+		}
+		req.Parameters = append(req.Parameters, apiParam)
+		req.Parameters = append(req.Parameters, buildParam)
 	}
 
 	if tf := os.Getenv("TEMPLATE_FILE"); tf != "" {
