@@ -23,7 +23,19 @@ type Version struct {
 
 type Versions []Version
 
-var URL = "https://convox.s3.amazonaws.com/release/versions.json"
+var URL_TEMPLATE = "https://%s.s3.amazonaws.com/release/versions.json"
+
+func versionBucket() string {
+	bucket := os.Getenv("CONVOX_CUSTOM_RELEASE")
+	if bucket == "" {
+		bucket = "convox"
+	}
+	return bucket
+}
+
+func URL() string {
+	return fmt.Sprintf(URL_TEMPLATE, versionBucket())
+}
 
 func (vs Versions) Resolve(version string) (v Version, err error) {
 	switch {
@@ -39,7 +51,7 @@ func (vs Versions) Resolve(version string) (v Version, err error) {
 
 // Get all versions as Versions type
 func All() (Versions, error) {
-	res, err := http.Get(URL)
+	res, err := http.Get(URL())
 
 	if err != nil {
 		return nil, err
@@ -199,7 +211,7 @@ func importVersions() (Versions, error) {
 	})
 
 	res, err := S3.ListObjects(&s3.ListObjectsInput{
-		Bucket:    aws.String("convox"),
+		Bucket:    aws.String(versionBucket()),
 		Delimiter: aws.String("/"),
 		Prefix:    aws.String("release/"),
 	})
@@ -244,7 +256,7 @@ func putVersions(vs Versions) error {
 	_, err = S3.PutObject(&s3.PutObjectInput{
 		ACL:           aws.String("public-read"),
 		Body:          bytes.NewReader(data),
-		Bucket:        aws.String("convox"),
+		Bucket:        aws.String(versionBucket()),
 		ContentLength: aws.Int64(int64(len(data))),
 		Key:           aws.String("release/versions.json"),
 	})
