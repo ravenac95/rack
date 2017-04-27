@@ -173,6 +173,10 @@ func (a *App) Create() error {
 		params["LambdaKeyPrefix"] = os.Getenv("LAMBDA_KEY_PREFIX")
 	}
 
+	if os.Getenv("CONVOX_CUSTOM_RELEASE") != "" {
+		params["ConvoxCustomRelease"] = os.Getenv("CONVOX_CUSTOM_RELEASE")
+	}
+
 	tags := map[string]string{
 		"Rack":   os.Getenv("RACK"),
 		"System": "convox",

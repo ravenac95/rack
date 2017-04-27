@@ -465,9 +465,9 @@
       "Description": "The key prefix for the lambda code. Generally should be `dev/`",
       "Default": ""
     },
-    "LambdaCustomReleaseBucketPrefix": {
+    "ConvoxCustomRelease": {
       "Type": "String",
-      "Description": "For preparing a custom lambda release",
+      "Description": "The string used to determine a custom release",
       "Default": "convox"
     }
   },
@@ -648,7 +648,7 @@
       "Type": "AWS::Lambda::Function",
       "Properties": {
         "Code": {
-          "S3Bucket": { "Fn::If": ["BlankLambdaBucket", { "Fn::Join": [ "-", [ {"Ref": "LambdaCustomReleaseBucketPrefix"}, { "Ref": "AWS::Region" } ] ] }, {"Ref": "LambdaBucket"} ] },
+          "S3Bucket": { "Fn::If": ["BlankLambdaBucket", { "Fn::Join": [ "-", [ {"Ref": "ConvoxCustomRelease"}, { "Ref": "AWS::Region" } ] ] }, {"Ref": "LambdaBucket"} ] },
           "S3Key": { "Fn::Join": [ "", [ {"Ref": "LambdaKeyPrefix"}, "release/", { "Ref": "Version" }, "/lambda/formation.zip" ] ] }
         },
         "Description": "Convox handler for custom resources",
@@ -1816,7 +1816,7 @@
       "Type": "AWS::Lambda::Function",
       "Properties": {
         "Code": {
-          "S3Bucket": { "Fn::If": ["BlankLambdaBucket", { "Fn::Join": [ "-", [ {"Ref": "LambdaCustomReleaseBucketPrefix"}, { "Ref": "AWS::Region" } ] ] }, {"Ref": "LambdaBucket"} ] },
+          "S3Bucket": { "Fn::If": ["BlankLambdaBucket", { "Fn::Join": [ "-", [ {"Ref": "ConvoxCustomRelease"}, { "Ref": "AWS::Region" } ] ] }, {"Ref": "LambdaBucket"} ] },
           "S3Key": { "Fn::Join": [ "", [ {"Ref": "LambdaKeyPrefix"}, "release/", { "Ref": "Version" }, "/lambda/lifecycle.zip" ] ] }
         },
         "Description": { "Fn::Join": [ "", [ "{\"Cluster\": \"", { "Ref": "Cluster" }, "\", \"Rack\": \"", { "Ref": "AWS::StackName" }, "\"}" ] ] },
@@ -2321,7 +2321,8 @@
               "SETTINGS_BUCKET": { "Ref": "Settings" },
               "STACK_ID": { "Ref": "AWS::StackId" },
               "LAMBDA_BUCKET": {"Ref": "LambdaBucket"},
-              "LAMBDA_KEY_PREFIX": {"Ref": "LambdaKeyPrefix"}
+              "LAMBDA_KEY_PREFIX": {"Ref": "LambdaKeyPrefix"},
+              "CONVOX_CUSTOM_RELEASE": {"Ref": "ConvoxCustomRelease"}
             },
             "Image": { "Fn::If": [ "BlankBuildImage", { "Fn::Join": [ ":", [ "convox/api", { "Ref": "Version" } ] ] }, { "Ref": "BuildImage" } ] },
             "Links": [],
@@ -2354,6 +2355,7 @@
               "CLIENT_ID": { "Ref": "ClientId" },
               "CLOUDFORMATION_TOPIC": { "Ref": "CloudformationTopic" },
               "CLUSTER": { "Ref": "Cluster" },
+              "CONVOX_CUSTOM_RELEASE": {"Ref": "ConvoxCustomRelease"},
               "CUSTOM_TOPIC": { "Fn::GetAtt": [ "CustomTopic", "Arn" ] },
               "DOCKER_IMAGE_API": { "Fn::Join": [ ":", [ { "Ref": "ConvoxApiImage" }, { "Ref": "Version" } ] ] },
               "DYNAMO_BUILDS": { "Ref": "DynamoBuilds" },
@@ -2432,6 +2434,7 @@
               "CLIENT_ID": { "Ref": "ClientId" },
               "CLOUDFORMATION_TOPIC": { "Ref": "CloudformationTopic" },
               "CLUSTER": { "Ref": "Cluster" },
+              "CONVOX_CUSTOM_RELEASE": {"Ref": "ConvoxCustomRelease"},
               "CUSTOM_TOPIC": { "Fn::GetAtt": [ "CustomTopic", "Arn" ] },
               "DOCKER_IMAGE_API": { "Fn::Join": [ ":", [ { "Ref": "ConvoxApiImage" }, { "Ref": "Version" } ] ] },
               "DYNAMO_BUILDS": { "Ref": "DynamoBuilds" },

@@ -1,6 +1,15 @@
 .PHONY: all release templates
 
+CONVOX_CUSTOM_RELEASE ?= convox
+
 all: templates
+
+clean:
+	make -C lambda/fluentd clean
+	make -C lambda/formation clean
+	make -C lambda/lifecycle clean
+	make -C lambda/cfevents clean
+	make -C lambda/ecsevents clean
 
 release:
 	make -C lambda/fluentd release VERSION=$(VERSION)
@@ -9,7 +18,7 @@ release:
 	mkdir -p /tmp/release/$(VERSION)
 	cd /tmp/release/$(VERSION)
 	jq '.Parameters.Version.Default |= "$(VERSION)"' dist/rack.json > formation.json
-	aws s3 cp formation.json s3://convox/release/$(VERSION)/formation.json --acl public-read
+	aws s3 cp formation.json s3://$(CONVOX_CUSTOM_RELEASE)/release/$(VERSION)/formation.json --acl public-read
 
 devrelease:
 	rm -r /tmp/release || true

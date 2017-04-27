@@ -4,8 +4,12 @@ CONVOX_BUILDER_TAG ?= convox/build
 CONVOX_BUILDER_TAG_VERSION ?= $(USER)
 CONVOX_API_TAG ?= convox/api
 CONVOX_API_TAG_VERSION ?= $(VERSION)
+CONVOX_CUSTOM_RELEASE ?= convox
 
 all: templates
+
+clean:
+	make -C provider clean
 
 builder:
 	docker build -t $(CONVOX_BUILDER_TAG):$(CONVOX_BUILDER_TAG_VERSION) -f api/cmd/build/Dockerfile .

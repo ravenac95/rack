@@ -1,5 +1,7 @@
 .PHONY: all build clean release
 
+CONVOX_CUSTOM_RELEASE ?= convox
+
 all: lambda.zip
 
 clean:
@@ -13,7 +15,7 @@ main: *.go
 
 release: lambda.zip
 	for region in $(shell cat ../../../../REGIONS); do \
-		aws s3 cp lambda.zip s3://convox-$$region/release/$(VERSION)/lambda/lifecycle.zip --acl public-read --region $$region; \
+		aws s3 cp lambda.zip s3://$(CONVOX_CUSTOM_RELEASE)-$$region/release/$(VERSION)/lambda/lifecycle.zip --acl public-read --region $$region; \
 	done
 
 devrelease: lambda.zip

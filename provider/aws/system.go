@@ -3,6 +3,7 @@ package aws
 import (
 	"fmt"
 	"io"
+	"os"
 	"strconv"
 	"strings"
 
@@ -216,6 +217,10 @@ func (p *AWSProvider) SystemReleases() (structs.Releases, error) {
 }
 
 func (p *AWSProvider) SystemSave(system structs.System) error {
+    customReleaseName := os.Getenv("CONVOX_CUSTOM_RELEASE")
+    if customReleaseName == "" {
+        customReleaseName = "convox"
+    }
 	// FIXME
 	// mac, err := maxAppConcurrency()
 
@@ -225,7 +230,7 @@ func (p *AWSProvider) SystemSave(system structs.System) error {
 	//   return fmt.Errorf("max process concurrency is %d, can't scale rack below %d instances", mac, mac+1)
 	// }
 
-	template := fmt.Sprintf("https://convox.s3.amazonaws.com/release/%s/formation.json", system.Version)
+	template := fmt.Sprintf("https://%s.s3.amazonaws.com/release/%s/formation.json", customReleaseName, system.Version)
 
 	params := map[string]string{
 		"InstanceCount": strconv.Itoa(system.Count),
