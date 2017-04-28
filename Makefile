@@ -44,3 +44,6 @@ devrelease:
 devtools:
 	mkdir -p dev
 	cd cmd/convox; go build -o ../../dev/convox -tags devtools
+
+nodevtools:
+	cd cmd/convox; go build -o ../../dev/convox 
