@@ -22,6 +22,7 @@ func TestPs(t *testing.T) {
 					App:     "fooApp",
 					Command: "fooCommand",
 					Host:    "fooHost",
+					Group:   "fooGroup",
 					Image:   "fooImage",
 					Name:    "fooName",
 					Ports:   []string{"fooPorts"},
@@ -40,7 +41,7 @@ func TestPs(t *testing.T) {
 		test.ExecRun{
 			Command: "convox ps --app myapp",
 			Exit:    0,
-			Stdout:  "ID     NAME     RELEASE     STARTED       COMMAND\nfooID  fooName  fooRelease  33 years ago  fooCommand\n",
+			Stdout:  "ID     GROUP     NAME     RELEASE     STARTED       COMMAND\nfooID  fooGroup  fooName  fooRelease  33 years ago  fooCommand\n",
 		},
 	)
 }
