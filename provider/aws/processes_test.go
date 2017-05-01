@@ -32,6 +32,7 @@ func TestProcessExec(t *testing.T) {
 		cycleProcessDescribeContainerInstances,
 		cycleProcessDescribeInstances,
 		cycleProcessDescribeInstances,
+		cycleProcessDescribeRackInstances,
 		cycleProcessListTasksAll,
 		cycleProcessDescribeTasks,
 		cycleProcessDescribeContainerInstances,
@@ -41,11 +42,7 @@ func TestProcessExec(t *testing.T) {
 
 	d := stubDocker(
 		cycleProcessDockerListContainers2,
-		cycleProcessDockerInspect,
-		cycleProcessDockerStats,
 		cycleProcessDockerListContainers1,
-		cycleProcessDockerInspect,
-		cycleProcessDockerStats,
 		cycleProcessDockerListContainers4,
 		cycleProcessDockerCreateExec,
 		cycleProcessDockerStartExec,
