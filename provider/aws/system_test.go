@@ -136,11 +136,18 @@ func TestSystemProcessesList(t *testing.T) {
 		cycleSystemDescribeTasks,
 		cycleSystemDescribeTaskDefinition,
 		cycleSystemDescribeContainerInstances,
+		cycleSystemDescribeInstances,
+		cycleSystemDescribeInstances,
 		cycleSystemDescribeRackInstances,
 		cycleSystemDescribeTaskDefinition2,
 		cycleSystemDescribeContainerInstances,
 	)
 	defer provider.Close()
+
+	d := stubDocker(
+		cycleSystemDockerListContainers2,
+	)
+	defer d.Close()
 
 	_, err := provider.SystemProcesses(structs.SystemProcessesOptions{
 		All: false,
@@ -155,11 +162,18 @@ func TestSystemProcessesListAll(t *testing.T) {
 		cycleSystemDescribeTasks,
 		cycleSystemDescribeTaskDefinition,
 		cycleSystemDescribeContainerInstances,
+		cycleSystemDescribeInstances,
+		cycleSystemDescribeInstances,
 		cycleSystemDescribeRackInstances,
 		cycleSystemDescribeTaskDefinition2,
 		cycleSystemDescribeContainerInstances,
 	)
 	defer provider.Close()
+
+	d := stubDocker(
+		cycleSystemDockerListContainers2,
+	)
+	defer d.Close()
 
 	_, err := provider.SystemProcesses(structs.SystemProcessesOptions{
 		All: true,
@@ -864,6 +878,35 @@ var cycleSystemDescribeContainerInstances = awsutil.Cycle{
 					"ec2InstanceId": "i-5bc45dc2"
 				}
 			]
+		}`,
+	},
+}
+
+var cycleSystemDescribeInstances = awsutil.Cycle{
+	Request: awsutil.Request{
+		RequestURI: "/",
+		Operation:  "",
+		Body:       `Action=DescribeInstances&InstanceId.1=i-5bc45dc2&Version=2016-11-15`,
+	},
+	Response: awsutil.Response{
+		StatusCode: 200,
+		Body: `
+			<?xml version="1.0" encoding="UTF-8"?>
+			<DescribeInstancesResponse xmlns="http://ec2.amazonaws.com/doc/2016-11-15/">
+				<reservationSet>
+					<item>
+						<reservationId>r-003ed1d7</reservationId>
+						<ownerId>778743527532</ownerId>
+						<groupSet/>
+						<instancesSet>
+							<item>
+								<instanceId>i-5bc45dc2</instanceId>
+								<privateIpAddress>10.0.1.244</privateIpAddress>
+							</item>
+						</instancesSet>
+					</item>
+				</reservationSet>
+			</DescribeInstancesRepsonse>
 		}`,
 	},
 }
