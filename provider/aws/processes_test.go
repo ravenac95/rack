@@ -72,11 +72,22 @@ func TestProcessList(t *testing.T) {
 		cycleProcessDescribeTasksAll,
 		cycleProcessDescribeTaskDefinition1,
 		cycleProcessDescribeContainerInstances,
+		cycleProcessDescribeInstances,
+		cycleProcessDescribeInstances,
 		cycleProcessDescribeTaskDefinition2,
 		cycleProcessDescribeContainerInstances,
+		cycleProcessDescribeInstances,
+		cycleProcessDescribeInstances,
 		cycleProcessDescribeRackInstances,
 	)
 	defer provider.Close()
+
+	d := stubDocker(
+		cycleProcessDockerListContainers2,
+		cycleProcessDockerListContainers1,
+		cycleProcessDockerListContainers4,
+	)
+	defer d.Close()
 
 	s, err := provider.ProcessList("myapp")
 
@@ -142,13 +153,27 @@ func TestProcessListWithBuildCluster(t *testing.T) {
 		cycleProcessDescribeTasksAllOnBuildCluster,
 		cycleProcessDescribeTaskDefinition1,
 		cycleProcessDescribeContainerInstances,
+		cycleProcessDescribeInstances,
+		cycleProcessDescribeInstances,
 		cycleProcessDescribeTaskDefinition2,
 		cycleProcessDescribeContainerInstances,
+		cycleProcessDescribeInstances,
+		cycleProcessDescribeInstances,
 		cycleProcessDescribeTaskDefinition2,
 		cycleProcessDescribeContainerInstances,
+		cycleProcessDescribeInstances,
+		cycleProcessDescribeInstances,
 		cycleProcessDescribeRackInstances,
 	)
 	defer provider.Close()
+
+	d := stubDocker(
+		cycleProcessDockerListContainers2,
+		cycleProcessDockerListContainers1,
+		cycleProcessDockerListContainers3,
+		cycleProcessDockerListContainers4,
+	)
+	defer d.Close()
 
 	provider.BuildCluster = "cluster-build"
 
@@ -224,8 +249,12 @@ func TestProcessRunAttached(t *testing.T) {
 		cycleProcessDescribeTasksAll,
 		cycleProcessDescribeTaskDefinition1,
 		cycleProcessDescribeContainerInstances,
+		cycleProcessDescribeInstances,
+		cycleProcessDescribeInstances,
 		cycleProcessDescribeTaskDefinition1,
 		cycleProcessDescribeContainerInstances,
+		cycleProcessDescribeInstances,
+		cycleProcessDescribeInstances,
 		cycleProcessDescribeRackInstances,
 		cycleProcessListTasksAll,
 		cycleProcessDescribeTasks,
@@ -236,9 +265,8 @@ func TestProcessRunAttached(t *testing.T) {
 	defer provider.Close()
 
 	d := stubDocker(
+		cycleProcessDockerListContainers2,
 		cycleProcessDockerListContainers1,
-		cycleProcessDockerInspect,
-		cycleProcessDockerStats,
 		cycleProcessDockerListContainers4,
 		cycleProcessDockerCreateExec,
 		cycleProcessDockerStartExec,
@@ -765,6 +793,10 @@ var cycleProcessDescribeTaskDefinition1 = awsutil.Cycle{
 							{
 								"name": "RELEASE",
 								"value": "R1234"
+							},
+							{
+								"name": "PROCESS_GROUP",
+								"value": "web"
 							}
 						],
 						"name": "web",
@@ -811,6 +843,10 @@ var cycleProcessDescribeTaskDefinition2 = awsutil.Cycle{
 							{
 								"name": "RELEASE",
 								"value": "R1234"
+							},
+							{
+								"name": "PROCESS_GROUP",
+								"value": "web"
 							}
 						],
 						"name": "web",
